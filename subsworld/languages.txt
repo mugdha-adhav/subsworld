@@ -1,0 +1,3 @@
+1 English eng english en
+2 French fre french fr
+3 Arabic ara arabic ar
