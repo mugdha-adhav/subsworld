@@ -154,7 +154,6 @@ def get_first_film(soup, language, section):
 
     if not tag:
         return
-
     url = SITE_DOMAIN + tag.findNext("ul").find("li").div.a.get("href") + '/' + language
     return Film.from_url(url)
 
@@ -169,7 +168,11 @@ def getSubsceneSubs(subData):
 
     if "Subtitle search by" in str(soup):
         rows = soup.find("table").tbody.find_all("tr")
-        subtitles = Subtitle.from_rows(rows)
+        langRows = []
+        for row in rows:
+            if row.find("span").text.strip().lower() == mLanguage.lower():
+                langRows.append(row)
+        subtitles = Subtitle.from_rows(langRows)
         return Film(subData.MNAME, subtitles=subtitles)
 
     for junk, search_type in SearchTypes.__members__.items():

@@ -1,9 +1,8 @@
 import base64
 import struct
 import zlib
-import os,re
+import os,re,io
 import os.path
-import sys
 from xmlrpc.client import ServerProxy, Transport
 import random
 
@@ -11,15 +10,6 @@ class Settings(object):
     OPENSUBTITLES_SERVER = 'http://api.opensubtitles.org/xml-rpc'
     USER_AGENT = 'TemporaryUserAgent'
     LANGUAGE = 'en'
-
-def decompress(data, encoding):
-    try:
-        return zlib.decompress(base64.b64decode(data),
-                               16 + zlib.MAX_WBITS).decode(encoding)
-    except UnicodeDecodeError as e:
-        print(e)
-        return
-
 
 class OpenSubtitles(object):
 
@@ -56,65 +46,45 @@ class OpenSubtitles(object):
 
     def download_subtitles(self, ids, filename,
                            output_directory, extension='srt'):
-        if len(ids) > 20:
-            print("Cannot download more than 20 files at once.",
-                  file=sys.stderr)
-            ids = ids[:20]
-
         self.data = self.xmlrpc.DownloadSubtitles(self.token, ids)
-
         encoded_data = self._get_from_data_or_none('data')
-
         if not encoded_data:
-            print("Data not encoded...")
             return
-        for item in encoded_data:
-            subfile_id = item['idsubtitlefile']
-
-            decoded_data = (decompress(item['data'], 'utf-8')
-                            or decompress(item['data'], 'latin1'))
-
-            if not decoded_data:
-                print("An error occurred while decoding subtitle "
-                      "file ID {}.".format(subfile_id), file=sys.stderr)
-            else:
-                # fname = override_filenames.get(subfile_id, subfile_id + '.' + extension)
-                filename = filename.rsplit('.',1)[0] + str(random.randint(1,10000)) + '.srt'
-                fpath = os.path.join(output_directory, filename)
-                try:
-                    with open(fpath, 'w') as f:
-                        f.write(decoded_data)
-                        return "successful"
-                except IOError as e:
-                    print("There was an error writing file {}.".format(fpath),
-                          file=sys.stderr)
-                    print(e)
-
-        return "failure"
-
-
+        try:
+            decoded_data = base64.b64decode(encoded_data[0].get('data'))
+            decoded_data = base64.b64decode(encoded_data[0].get('data'))
+            decoded_data = zlib.decompress(decoded_data, 16+zlib.MAX_WBITS)
+            decoded_data = decoded_data.decode('utf-8')
+        except:
+            return
+        if not decoded_data:
+            return
+        else:
+            filename = filename.rsplit('.',1)[0] + str(random.randint(1,10000)) + '.srt'
+            fpath = os.path.join(output_directory, filename)
+            try:
+                with io.open(fpath, 'w', encoding='utf-8') as f:
+                    f.write(decoded_data)
+            except Exception:
+                pass
+        return
 
 def getOpensubtitleSubs(subData):
     ost = OpenSubtitles()
-    token = ost.login('subsworld', 'subsworld')
-
+    token = ost.login('mugdhaadhav', 'yui4avii')
     if token is None:
         print('\n\nInvalid credentials for OpenSubtitle...')
         return False
-
     else:
         langFile = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"languages.txt"), "r")
         for l in langFile:
             if re.match(subData.MLANG+' ', l):
                 mLanguage = l.split(' ')[2]
-
         langFile.close()
-
         file = File(subData.MPATH)
         hash = file.get_hash()
         size = file.size
         data = ost.search_subtitles([{'sublanguageid': mLanguage, 'moviehash': hash, 'moviebytesize': size}])
-
         return data
 
 
